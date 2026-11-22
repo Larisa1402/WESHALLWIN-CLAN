@@ -341,7 +341,9 @@ function drawTitled(){
   $("titledPlayers").innerHTML=t.length?t.map(p=>`<a class="row" href="https://www.chess.com/member/${encodeURIComponent(p.username)}" target="_blank" rel="noopener"><img src="${esc(p.avatar)}" alt=""><div class="info"><span class="badge">${esc(p.title)}</span><b>${esc(p.username)}</b><small>${p.best?`${p.best} · ${p.mode}`:"Rating unavailable"}</small></div></a>`).join(""):'<div class="empty">No titled players among the club staff. The club API lists staff profiles, not every member.</div>';
 }
 async function loadStaff(d){
-  const names=[...new Set((d.admins||[]).map(nameFromUrl).filter(Boolean))];
+  // the club profile lists staff under "admin" (singular); the owner and Super Admin are always included
+  const raw=[...(d.admin||d.admins||[]).map(nameFromUrl),"weshallwin","VolchitsaX"].filter(Boolean);
+  const names=[...new Map(raw.map(n=>[n.toLowerCase(),n])).values()];
   if(!names.length){
     $("directoryResults").innerHTML='<div class="empty" style="grid-column:1/-1">The club API returned no staff profiles.</div>';
     $("titledPlayers").innerHTML='<div class="empty">No staff profiles to check for titles.</div>';
