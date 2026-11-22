@@ -88,6 +88,13 @@ a{color:inherit;text-decoration:none}button,input,select{font:inherit}
 .principle:last-child{margin-bottom:0}.principle b{font-size:10px;display:block}.principle small{font-size:9px;color:var(--muted)}
 .footer{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:9px;padding:20px 2px 0}.footer strong{color:var(--light);font-family:Orbitron;letter-spacing:1px}
 .toast{position:fixed;bottom:18px;right:18px;padding:11px 15px;border:1px solid var(--light);border-radius:10px;background:var(--panel);color:var(--text);font-size:10px;opacity:0;transform:translateY(10px);transition:.25s;z-index:99;pointer-events:none}.toast.show{opacity:1;transform:none}
+.mc-wrap{display:flex;justify-content:center;margin-bottom:16px}
+.mcard{width:256px;height:140px;padding:14px 16px 13px;display:flex;flex-direction:column;justify-content:space-between;background:var(--panel);border:1px solid var(--line);border-radius:4px;color:var(--text);overflow:hidden}
+.mc-head{display:flex;align-items:baseline;gap:9px}.mc-mark{font-size:19px;line-height:1;color:var(--light)}
+.mc-title{font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:16px;color:var(--text)}.mc-rule{flex:1;height:1px;align-self:center;background:var(--line)}
+.mc-num{display:flex;align-items:baseline;gap:8px;font-family:Georgia,'Times New Roman',serif}.mc-count{font-size:38px;line-height:1;color:var(--light)}.mc-goal{font-size:14px;color:var(--muted)}
+.mc-track{height:6px;background:var(--bg);border:1px solid var(--line);border-radius:1px;overflow:hidden}.mc-fill{height:100%;width:0;background:var(--light);transition:width 1s ease}
+.mc-foot{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);letter-spacing:.3px;margin-top:7px}
 @media(max-width:560px){.intel{grid-template-columns:repeat(2,minmax(0,1fr))}.leaders,.results{grid-template-columns:1fr}.trophies{grid-template-columns:repeat(2,minmax(0,1fr))}.pill.hide-sm{display:none}.dojo{flex-direction:column}}
 @media(prefers-reduced-motion:reduce){*{transition-duration:.01ms!important;scroll-behavior:auto!important}}
 </style>
@@ -106,6 +113,13 @@ a{color:inherit;text-decoration:none}button,input,select{font:inherit}
     <div class="tags"><span class="tag">♞ STRATEGY FIRST</span><span class="tag">✦ CLAN POWERED</span><span class="tag">⚡ BUILT TO IMPROVE</span></div>
     <a class="cta" href="#directory">EXPLORE THE PLAYERS ↗</a>
   </div></section>
+
+  <div class="mc-wrap"><div class="mcard" role="group" aria-label="WESHALLWIN CLAN member count">
+    <div class="mc-head"><span class="mc-mark" aria-hidden="true">♞</span><span class="mc-title">Members</span><span class="mc-rule"></span></div>
+    <div class="mc-num"><span class="mc-count" id="mcCount">…</span><span class="mc-goal">of <span id="mcGoal">1,000</span></span></div>
+    <div><div class="mc-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="mcTrack"><div class="mc-fill" id="mcBar"></div></div>
+    <div class="mc-foot"><span id="mcPct">&nbsp;</span><span id="mcLeft">&nbsp;</span></div></div>
+  </div></div>
 
   <div class="grid">
     <section class="panel" id="intelligence">
@@ -141,8 +155,9 @@ a{color:inherit;text-decoration:none}button,input,select{font:inherit}
     </section>
 
     <section class="panel" id="members">
-      <div class="head"><div class="title"><i>✦</i>Club Profile</div><span class="sub">FROM THE CLUB API</span></div>
-      <div class="list" id="membersList"><div class="empty">Loading the club profile…</div></div>
+      <div class="head"><div class="title"><i>✦</i>Newest Members</div><span class="sub">LATEST ARRIVALS</span></div>
+      <div class="list" id="membersList"><div class="empty">Retrieving the latest clan members…</div></div>
+      <div class="note" id="membersNote"></div>
     </section>
 
     <section class="panel" id="titled">
@@ -246,6 +261,16 @@ $("nextTier").onclick=()=>{page++;renderRoadmap()};
 const TROPHIES=[[10,"First Circle","The first ten members","♟"],[25,"Rising Banner","Twenty-five members","✦"],[50,"Fifty Strong","A growing clan","♞"],[100,"Century Club","One hundred members","♜"],[250,"Grand Assembly","A quarter thousand","♛"],[500,"Five Hundred","Half a thousand","♕"],[1000,"Thousand Minds","A thousand members","👑"],[2500,"Legendary Clan","Twenty-five hundred","🏆"]];
 function renderTrophies(){$("trophyGrid").innerHTML=TROPHIES.map(([t,n,d,s])=>{const w=clubCount>=t;return `<div class="trophy ${w?"on":""}"><div class="sym">${s}</div><b>${n}</b><small>${d}</small><em>${w?"✦ UNLOCKED":fmt(t)+" MEMBERS"}</em></div>`}).join("")}
 renderTrophies();
+const MC_GOAL=1000; // member-card target: change to your goal
+function renderMemberCard(count){
+  $("mcGoal").textContent=MC_GOAL.toLocaleString();
+  if(!Number.isFinite(count)){$("mcCount").textContent="—";$("mcPct").textContent="Count unavailable";$("mcLeft").innerHTML="&nbsp;";return}
+  const pc=Math.min(count/MC_GOAL*100,100);
+  $("mcCount").textContent=count.toLocaleString();$("mcBar").style.width=pc+"%";$("mcTrack").setAttribute("aria-valuenow",Math.round(pc));
+  $("mcPct").textContent=Math.floor(pc)+"% of the way";
+  $("mcLeft").textContent=count>=MC_GOAL?"Goal reached":(MC_GOAL-count).toLocaleString()+" to go";
+}
+renderMemberCard(NaN);
 async function updateClub(){
   try{
     const d=await getJSON(CLUB_API);
@@ -254,12 +279,12 @@ async function updateClub(){
     $("intelRating").textContent=d.average_daily_rating?Math.round(d.average_daily_rating).toLocaleString():"—";
     $("intelCreated").textContent=d.created?fmtDate(d.created,true):"—";
     $("intelActive").textContent=d.last_activity?timeAgo(d.last_activity):"—";
-    renderRoadmap();renderTrophies();
+    renderRoadmap();renderTrophies();renderMemberCard(clubCount);
     const pc=Math.min(100,clubCount/1000*100);$("titledFill").style.width=pc+"%";$("titledProgText").textContent=`${Math.round(pc)}% · ${clubCount.toLocaleString()} / 1,000`;
     $("intelStatus").textContent="SIGNAL STABLE";$("lastSync").textContent="Synced "+new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
     return d;
   }catch(e){
-    console.error(e);
+    console.error(e);renderMemberCard(NaN);
     $("intelStatus").textContent="SYNC FAILED";$("lastSync").textContent="Tap retry";
     $("milestoneMap").innerHTML=errBox("Could not load the club profile.",e);
     ["directoryResults","membersList","titledPlayers"].forEach(id=>$(id).innerHTML=errBox("Could not load the club profile.",e));
@@ -286,12 +311,10 @@ const fmtDate=(ts,short)=>new Intl.DateTimeFormat("en-US",short?{month:"short",y
 const nameFromUrl=u=>decodeURIComponent(String(u).replace(/\/+$/,"").split("/").pop());
 const roleOf=n=>({weshallwin:"Owner",volchitsax:"Super Admin"}[String(n).toLowerCase()]||"Admin");
 
-function renderProfile(d){
-  const country=String(d.country||"").split("/").pop();
-  const desc=String(d.description||"").replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim().slice(0,280);
-  const items=[["Club name",d.name||"WESHALLWIN CLAN"],["Founded",d.created?fmtDate(d.created):"—"],["Last activity",d.last_activity?timeAgo(d.last_activity)+" · "+fmtDate(d.last_activity):"—"],["Members",clubCount.toLocaleString()],["Average daily rating",d.average_daily_rating?Math.round(d.average_daily_rating).toLocaleString():"—"],["Country",country||"—"],["Visibility",d.visibility||"—"]];
-  if(desc)items.push(["Description",desc]);
-  $("membersList").innerHTML=items.map(([k,v])=>`<div class="row"><div class="info"><b>${esc(k)}</b><small>${esc(v)}</small></div></div>`).join("");
+function drawNewest(){
+  const rows=staff.slice(0,5);
+  $("membersList").innerHTML=rows.length?rows.map(m=>`<a class="row" href="https://www.chess.com/member/${encodeURIComponent(m.username)}" target="_blank" rel="noopener"><img src="${esc(m.avatar)}" alt=""><div class="info"><b>${esc(m.username)}</b><small>${roleOf(m.username)}${m.last?" · online "+timeAgo(m.last):""}</small></div><span class="rating">${m.best?m.mode+" "+m.best:"Unrated"}</span></a>`).join(""):'<div class="empty">No member records returned by the club API.</div>';
+  $("membersNote").textContent="The club API doesn’t list new arrivals, so this shows the club’s staff profiles.";
 }
 
 let staff=[];
@@ -321,10 +344,11 @@ async function loadStaff(d){
   const names=[...new Set((d.admins||[]).map(nameFromUrl).filter(Boolean))];
   if(!names.length){
     $("directoryResults").innerHTML='<div class="empty" style="grid-column:1/-1">The club API returned no staff profiles.</div>';
-    $("titledPlayers").innerHTML='<div class="empty">No staff profiles to check for titles.</div>';return;
+    $("titledPlayers").innerHTML='<div class="empty">No staff profiles to check for titles.</div>';
+    $("membersList").innerHTML='<div class="empty">No member records returned by the club API.</div>';return;
   }
   staff=(await inBatches(names,4,fetchStaff)).sort((a,b)=>b.best-a.best);
-  drawDirectory();drawTitled();
+  drawDirectory();drawTitled();drawNewest();
 }
 $("directorySearch").addEventListener("input",drawDirectory);
 
@@ -367,7 +391,7 @@ $("year").textContent=new Date().getFullYear();
 $("todayPill").textContent=new Intl.DateTimeFormat("en-US",{month:"short",day:"numeric"}).format(new Date());
 async function refresh(){
   const d=await updateClub();
-  if(d){renderProfile(d);loadStaff(d)}
+  if(d){loadStaff(d)}
 }
 loadLeadership();refresh();setInterval(refresh,300000);
 </script>
