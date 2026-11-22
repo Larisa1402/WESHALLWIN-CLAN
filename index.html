@@ -112,9 +112,9 @@ a{color:inherit;text-decoration:none}button,input,select{font:inherit}
       <div class="head"><div><div class="title"><i>◈</i>Club Intelligence</div><div class="kick">LIVE SIGNALS FROM THE CHESS.COM CLUB</div></div><span class="sub"><i class="dot"></i><span id="intelStatus">SYNCING</span><br><span id="lastSync">—</span></span></div>
       <div class="intel">
         <div class="stat"><small>MEMBERS</small><strong id="intelMembers">—</strong><em>Club profile</em></div>
-        <div class="stat"><small>WEEKLY</small><strong id="intelWeekly">—</strong><em>Weekly list</em></div>
-        <div class="stat"><small>MONTHLY</small><strong id="intelMonthly">—</strong><em>Monthly list</em></div>
-        <div class="stat"><small>ALL-TIME</small><strong id="intelAllTime">—</strong><em>All-time list</em></div>
+        <div class="stat"><small>AVG DAILY RATING</small><strong id="intelRating">—</strong><em>Club average</em></div>
+        <div class="stat"><small>FOUNDED</small><strong id="intelCreated" style="font-size:15px">—</strong><em>Club created</em></div>
+        <div class="stat"><small>LAST ACTIVE</small><strong id="intelActive" style="font-size:15px">—</strong><em>Club activity</em></div>
       </div>
     </section>
 
@@ -135,18 +135,18 @@ a{color:inherit;text-decoration:none}button,input,select{font:inherit}
     </section>
 
     <section class="panel" id="directory">
-      <div class="head"><div><div class="title"><i>◎</i>Player Observatory</div><div class="kick">SEARCH THE CLUB MEMBER RECORDS</div></div><span class="sub" id="directoryCount">0 RECORDS</span></div>
-      <div class="tools"><input id="directorySearch" type="search" placeholder="Find a player by username…"><select id="directoryFilter" aria-label="Filter"><option value="all">All records</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="all-time">All-time</option></select></div>
+      <div class="head"><div><div class="title"><i>◎</i>Player Observatory</div><div class="kick">CLUB STAFF PROFILES FROM THE CLUB API</div></div><span class="sub" id="directoryCount">0 PROFILES</span></div>
+      <div class="tools"><input id="directorySearch" type="search" placeholder="Find a staff member by username…"></div>
       <div class="results" id="directoryResults"><div class="empty" style="grid-column:1/-1">Loading the player observatory…</div></div>
     </section>
 
     <section class="panel" id="members">
-      <div class="head"><div class="title"><i>✦</i>Newest Members</div><span class="sub">LATEST ARRIVALS</span></div>
-      <div class="list" id="membersList"><div class="empty">Retrieving the latest clan members…</div></div>
+      <div class="head"><div class="title"><i>✦</i>Club Profile</div><span class="sub">FROM THE CLUB API</span></div>
+      <div class="list" id="membersList"><div class="empty">Loading the club profile…</div></div>
     </section>
 
     <section class="panel" id="titled">
-      <div class="head"><div class="title"><i>♜</i>Titled Players</div><span class="sub">GM · IM · FM · CM · WOMEN’S TITLES</span></div>
+      <div class="head"><div class="title"><i>♜</i>Titled Players</div><span class="sub">TITLED CLUB STAFF</span></div>
       <div class="meta" style="margin-top:0"><span>Titled found: <b id="titledCount">—</b></span><span id="titledProgText">—</span></div>
       <div class="bar" style="margin-bottom:14px"><div class="fill" id="titledFill"></div></div>
       <div class="list" id="titledPlayers"><div class="empty">Scanning titled-player records…</div></div>
@@ -196,7 +196,7 @@ a{color:inherit;text-decoration:none}button,input,select{font:inherit}
 <div class="toast" id="toast"></div>
 <script>
 const CLUB_SLUG="weshallwin-clan";
-const CLUB_API=`https://api.chess.com/pub/club/${CLUB_SLUG}`,MEMBERS_API=`${CLUB_API}/members`;
+const CLUB_API=`https://api.chess.com/pub/club/${CLUB_SLUG}`;
 const DEFAULT_AVATAR="https://www.chess.com/bundles/web/images/noavatar_l.png";
 const $=id=>document.getElementById(id);
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -219,14 +219,6 @@ async function getJSON(u,tries=3){
 const fmt=n=>n>=1000?(n/1000).toFixed(n%1000===0?0:1)+"K":n.toLocaleString();
 function timeAgo(ts){if(!ts)return"recently";const d=Math.floor(Date.now()/1000)-Number(ts);if(!Number.isFinite(d)||d<0)return"recently";if(d>=86400)return Math.floor(d/86400)+"d ago";if(d>=3600)return Math.floor(d/3600)+"h ago";if(d>=60)return Math.floor(d/60)+"m ago";return"just now"}
 function errBox(msg,e){return `<div class="empty" style="grid-column:1/-1">${msg}<br><small>(${esc(e&&e.message||"network error")})</small><br><button class="btn" type="button" onclick="refresh()">↻ Retry</button></div>`}
-
-/* The members list is fetched ONCE and shared by all three panels */
-let membersPromise=null;
-function getMembers(force){
-  if(force||!membersPromise)membersPromise=getJSON(MEMBERS_API).catch(e=>{membersPromise=null;throw e});
-  return membersPromise;
-}
-const uniqueMembers=d=>[...new Map([...(d.weekly||[]),...(d.monthly||[]),...(d.all_time||[])].filter(x=>x&&x.username).map(x=>[String(x.username).toLowerCase(),x])).values()];
 
 /* Leadership */
 async function loadLeadership(){
@@ -255,10 +247,24 @@ const TROPHIES=[[10,"First Circle","The first ten members","♟"],[25,"Rising Ba
 function renderTrophies(){$("trophyGrid").innerHTML=TROPHIES.map(([t,n,d,s])=>{const w=clubCount>=t;return `<div class="trophy ${w?"on":""}"><div class="sym">${s}</div><b>${n}</b><small>${d}</small><em>${w?"✦ UNLOCKED":fmt(t)+" MEMBERS"}</em></div>`}).join("")}
 renderTrophies();
 async function updateClub(){
-  try{const d=await getJSON(CLUB_API);clubCount=Number(d.members_count)||0;let p=1;while(clubCount>=BASE[6]+(p-1)*1000)p++;maxPage=p;page=maxPage;
-    $("intelMembers").textContent=clubCount.toLocaleString();renderRoadmap();renderTrophies();
-    const pc=Math.min(100,clubCount/1000*100);$("titledFill").style.width=pc+"%";$("titledProgText").textContent=`${Math.round(pc)}% · ${clubCount.toLocaleString()} / 1,000`}
-  catch(e){console.error(e);$("milestoneMap").innerHTML=errBox("Could not load the club profile.",e)}
+  try{
+    const d=await getJSON(CLUB_API);
+    clubCount=Number(d.members_count)||0;let p=1;while(clubCount>=BASE[6]+(p-1)*1000)p++;maxPage=p;page=maxPage;
+    $("intelMembers").textContent=clubCount.toLocaleString();
+    $("intelRating").textContent=d.average_daily_rating?Math.round(d.average_daily_rating).toLocaleString():"—";
+    $("intelCreated").textContent=d.created?fmtDate(d.created,true):"—";
+    $("intelActive").textContent=d.last_activity?timeAgo(d.last_activity):"—";
+    renderRoadmap();renderTrophies();
+    const pc=Math.min(100,clubCount/1000*100);$("titledFill").style.width=pc+"%";$("titledProgText").textContent=`${Math.round(pc)}% · ${clubCount.toLocaleString()} / 1,000`;
+    $("intelStatus").textContent="SIGNAL STABLE";$("lastSync").textContent="Synced "+new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+    return d;
+  }catch(e){
+    console.error(e);
+    $("intelStatus").textContent="SYNC FAILED";$("lastSync").textContent="Tap retry";
+    $("milestoneMap").innerHTML=errBox("Could not load the club profile.",e);
+    ["directoryResults","membersList","titledPlayers"].forEach(id=>$(id).innerHTML=errBox("Could not load the club profile.",e));
+    return null;
+  }
 }
 
 /* Player stats (sequential-friendly, lowercase usernames) */
@@ -275,55 +281,52 @@ async function playerData(username,joined){
 }
 async function inBatches(items,size,fn){const out=[];for(let i=0;i<items.length;i+=size){out.push(...await Promise.all(items.slice(i,i+size).map(fn)))}return out}
 
-/* Player Observatory + Club Intelligence */
-let directory=[];
+/* Everything below uses only the club profile endpoint: CLUB_API */
+const fmtDate=(ts,short)=>new Intl.DateTimeFormat("en-US",short?{month:"short",year:"numeric"}:{year:"numeric",month:"short",day:"numeric"}).format(new Date(ts*1000));
+const nameFromUrl=u=>decodeURIComponent(String(u).replace(/\/+$/,"").split("/").pop());
+const roleOf=n=>({weshallwin:"Owner",volchitsax:"Super Admin"}[String(n).toLowerCase()]||"Admin");
+
+function renderProfile(d){
+  const country=String(d.country||"").split("/").pop();
+  const desc=String(d.description||"").replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim().slice(0,280);
+  const items=[["Club name",d.name||"WESHALLWIN CLAN"],["Founded",d.created?fmtDate(d.created):"—"],["Last activity",d.last_activity?timeAgo(d.last_activity)+" · "+fmtDate(d.last_activity):"—"],["Members",clubCount.toLocaleString()],["Average daily rating",d.average_daily_rating?Math.round(d.average_daily_rating).toLocaleString():"—"],["Country",country||"—"],["Visibility",d.visibility||"—"]];
+  if(desc)items.push(["Description",desc]);
+  $("membersList").innerHTML=items.map(([k,v])=>`<div class="row"><div class="info"><b>${esc(k)}</b><small>${esc(v)}</small></div></div>`).join("");
+}
+
+let staff=[];
+async function fetchStaff(name){
+  const u=encodeURIComponent(String(name).toLowerCase());
+  try{
+    const p=await getJSON(`https://api.chess.com/pub/player/${u}`,2);
+    let best=0,mode="Unrated";
+    try{const st=await getJSON(`https://api.chess.com/pub/player/${u}/stats`,2);
+      for(const[k,l]of[["chess_rapid","Rapid"],["chess_blitz","Blitz"],["chess_bullet","Bullet"],["chess_daily","Daily"]]){const n=st?.[k]?.last?.rating||st?.[k]?.best?.rating||0;if(n>best){best=n;mode=l}}
+    }catch{}
+    return{username:p.username||name,avatar:p.avatar||DEFAULT_AVATAR,title:p.title||"",best,mode,last:p.last_online||0};
+  }catch{return{username:name,avatar:DEFAULT_AVATAR,title:"",best:0,mode:"Unrated",last:0}}
+}
 function drawDirectory(){
-  const q=$("directorySearch").value.trim().toLowerCase(),f=$("directoryFilter").value;
-  const rows=directory.filter(x=>(f==="all"||x.sources.includes(f))&&x.username.toLowerCase().includes(q)).slice(0,80);
-  $("directoryCount").textContent=directory.length.toLocaleString()+" RECORDS";
-  $("directoryResults").innerHTML=rows.length?rows.map(x=>`<a class="person" href="https://www.chess.com/member/${encodeURIComponent(x.username)}" target="_blank" rel="noopener"><span class="avatar">${esc(x.username[0].toUpperCase())}</span><span style="min-width:0"><b>${esc(x.username)}</b><small>${x.joined?"Joined "+timeAgo(x.joined):"Member record"} · ${esc(x.sources.join(" / "))}</small></span></a>`).join(""):'<div class="empty" style="grid-column:1/-1">No matching players in the loaded records.</div>';
+  const q=$("directorySearch").value.trim().toLowerCase();
+  const rows=staff.filter(x=>x.username.toLowerCase().includes(q));
+  $("directoryCount").textContent=staff.length+" PROFILES";
+  $("directoryResults").innerHTML=rows.length?rows.map(x=>`<a class="person" href="https://www.chess.com/member/${encodeURIComponent(x.username)}" target="_blank" rel="noopener"><img class="avatar" src="${esc(x.avatar)}" alt=""><span style="min-width:0"><b>${esc(x.username)}</b><small>${roleOf(x.username)}${x.best?" · "+x.mode+" "+x.best:""}${x.last?" · online "+timeAgo(x.last):""}</small></span></a>`).join(""):'<div class="empty" style="grid-column:1/-1">No matching staff profiles.</div>';
 }
-async function loadIntel(){
-  try{const d=await getMembers(),w=d.weekly||[],m=d.monthly||[],a=d.all_time||[];
-    $("intelWeekly").textContent=w.length.toLocaleString();$("intelMonthly").textContent=m.length.toLocaleString();$("intelAllTime").textContent=a.length.toLocaleString();
-    const map=new Map();
-    for(const[k,arr]of[["weekly",w],["monthly",m],["all-time",a]])for(const it of arr){if(!it||!it.username)continue;const key=String(it.username).toLowerCase();if(!map.has(key))map.set(key,{username:String(it.username),joined:it.joined||0,sources:[]});const r=map.get(key);if((it.joined||0)>r.joined)r.joined=it.joined;if(!r.sources.includes(k))r.sources.push(k)}
-    directory=[...map.values()].sort((a,b)=>b.joined-a.joined);drawDirectory();
-    $("intelStatus").textContent="SIGNAL STABLE";$("lastSync").textContent="Synced "+new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
-  }catch(e){console.warn(e);$("intelStatus").textContent="SYNC FAILED";$("lastSync").textContent="Tap retry below";$("directoryResults").innerHTML=errBox("The Chess.com member list could not be loaded.",e)}
+function drawTitled(){
+  const t=staff.filter(x=>x.title);
+  $("titledCount").textContent=t.length;
+  $("titledPlayers").innerHTML=t.length?t.map(p=>`<a class="row" href="https://www.chess.com/member/${encodeURIComponent(p.username)}" target="_blank" rel="noopener"><img src="${esc(p.avatar)}" alt=""><div class="info"><span class="badge">${esc(p.title)}</span><b>${esc(p.username)}</b><small>${p.best?`${p.best} · ${p.mode}`:"Rating unavailable"}</small></div></a>`).join(""):'<div class="empty">No titled players among the club staff. The club API lists staff profiles, not every member.</div>';
 }
-$("directorySearch").addEventListener("input",drawDirectory);$("directoryFilter").addEventListener("change",drawDirectory);
-
-/* Newest members */
-async function loadNewest(){
-  const box=$("membersList");
-  try{const d=await getMembers();const u=uniqueMembers(d).sort((a,b)=>(b.joined||0)-(a.joined||0)).slice(0,3);
-    if(!u.length){box.innerHTML='<div class="empty">The club API returned no member records yet.</div>';return}
-    const rows=await inBatches(u,3,x=>playerData(x.username,x.joined));
-    box.innerHTML=rows.map(m=>`<a class="row" href="https://www.chess.com/member/${encodeURIComponent(m.username)}" target="_blank" rel="noopener"><img src="${esc(m.avatar)}" alt=""><div class="info"><b>${esc(m.username)}</b><small>Joined ${timeAgo(m.joined)}</small></div><span class="rating">${m.best?m.mode+" "+m.best:"Unrated"}</span></a>`).join("")}
-  catch(e){console.error(e);box.innerHTML=errBox("Unable to retrieve newest members.",e)}
+async function loadStaff(d){
+  const names=[...new Set((d.admins||[]).map(nameFromUrl).filter(Boolean))];
+  if(!names.length){
+    $("directoryResults").innerHTML='<div class="empty" style="grid-column:1/-1">The club API returned no staff profiles.</div>';
+    $("titledPlayers").innerHTML='<div class="empty">No staff profiles to check for titles.</div>';return;
+  }
+  staff=(await inBatches(names,4,fetchStaff)).sort((a,b)=>b.best-a.best);
+  drawDirectory();drawTitled();
 }
-
-/* Titled players: title lists are fetched one at a time to avoid rate limits */
-const TITLES=["GM","IM","FM","CM","NM","WGM","WIM","WFM","WCM"];
-let titleCache=null;
-async function loadTitleSets(){
-  if(titleCache)return titleCache;
-  const sets=[];
-  for(const c of TITLES){try{const d=await getJSON(`https://api.chess.com/pub/titled/${c}`,2);sets.push(new Set((d.players||[]).map(x=>String(x).toLowerCase())))}catch{sets.push(new Set())}}
-  if(sets.every(s=>s.size===0))throw new Error("title lists unavailable");
-  return titleCache=sets;
-}
-async function loadTitled(){
-  const box=$("titledPlayers");
-  try{const club=await getMembers();const sets=await loadTitleSets();const found=[];
-    for(const m of uniqueMembers(club)){const i=sets.findIndex(s=>s.has(String(m.username).toLowerCase()));if(i>=0)found.push({username:m.username,title:TITLES[i],joined:m.joined})}
-    $("titledCount").textContent=found.length;
-    if(!found.length){box.innerHTML='<div class="empty">No titled players found in the current club member lists.</div>';return}
-    const players=(await inBatches(found.slice(0,24),4,async x=>({...(await playerData(x.username,x.joined)),title:x.title}))).sort((a,b)=>b.best-a.best);
-    box.innerHTML=players.slice(0,12).map(p=>`<a class="row" href="https://www.chess.com/member/${encodeURIComponent(p.username)}" target="_blank" rel="noopener"><img src="${esc(p.avatar)}" alt=""><div class="info"><span class="badge">${esc(p.title)}</span><b>${esc(p.username)}</b><small>${p.best?`${p.best} · ${p.mode}`:"Rating unavailable"}</small></div></a>`).join("")}
-  catch(e){console.error(e);box.innerHTML=errBox("Titled-player lookup failed.",e)}
-}
+$("directorySearch").addEventListener("input",drawDirectory);
 
 /* Dojo */
 let dDur=900,dRem=900,dInt=null,dRun=false;
@@ -363,10 +366,8 @@ $("prevMonth").onclick=()=>{cal.setMonth(cal.getMonth()-1);renderCal()};$("nextM
 $("year").textContent=new Date().getFullYear();
 $("todayPill").textContent=new Intl.DateTimeFormat("en-US",{month:"short",day:"numeric"}).format(new Date());
 async function refresh(){
-  getMembers(true).catch(()=>{});          // one shared request
-  updateClub();
-  await Promise.allSettled([loadIntel(),loadNewest()]);
-  loadTitled();
+  const d=await updateClub();
+  if(d){renderProfile(d);loadStaff(d)}
 }
 loadLeadership();refresh();setInterval(refresh,300000);
 </script>
